@@ -197,7 +197,8 @@ def gather_process():
 
     print("download is done succesfull")
 
-    users.to_csv(SCRAPPED_FILE)
+    users.to_csv(SCRAPPED_FILE, encoding="utf8", index=False)
+    users.to_csv(TABLE_FORMAT_FILE, encoding="utf8", index=False)
 
 
 def convert_data_to_table_format():
@@ -215,6 +216,15 @@ def stats_of_data():
     # Load pandas DataFrame and print to stdout different statistics about the data.
     # Try to think about the data and use not only describe and info.
     # Ask yourself what would you like to know about this data (most frequent word, or something else)
+    import pandas as pd
+
+    users = pd.read_csv("data.csv");
+
+    print("Количество мужчин, которым понравился пост: {}\n".format(len(users[users.sex == 2].index)))
+    print("Количество женщин, которым понравился пост: {}\n".format(len(users[users.sex == 1].index)))
+    print("Top5 городов среди лайкнувших: \n{}\n".format(
+        users[["city_id", "city"]].groupby("city")['city_id'].count().reset_index(name="count").sort_values(['count'],ascending=False).head().reset_index().drop(["index"], axis=1))
+    )
 
 
 if __name__ == '__main__':
