@@ -138,11 +138,66 @@ TABLE_FORMAT_FILE = 'data.csv'
 
 def gather_process():
     logger.info("gather")
-    storage = FileStorage(SCRAPPED_FILE)
+    # storage = FileStorage(SCRAPPED_FILE)
 
     # You can also pass a storage
-    scrapper = Scrapper()
-    scrapper.scrap_process(storage)
+    # scrapper = Scrapper()
+    # scrapper.scrap_process(storage)
+    import vk
+    import pandas as pd
+    import time
+
+    total_users = 1500
+
+    # ограничение api
+    batch_size = 100
+    delay = .3
+
+    # access_token = ""
+    # session = vk.Session(access_token=access_token)
+    session = vk.Session()
+    api = vk.API(session)
+
+    # https://vk.com/wall-460389_2711177
+
+    # получаем первую партию вне цикла, чтобы было из чего создать первичный датафрейм, с которым мы будем далее конкатенировать новые батчи с пользователями
+    response = api.likes.getList(type="post", owner_id="-460389", item_id="2711177", extended=0)
+    userIds = response['users']
+    print("Загружено юзеров: 100")
+
+    usersList = api.users.get(user_ids=userIds, fields=['bdate', 'sex', 'city'])
+    users = pd.DataFrame(usersList)
+
+    # идем циклом пока не наберем достаточное количество пользователей
+    for i in range(1, int(total_users / batch_size)):
+        time.sleep(delay)
+        offset = i * batch_size
+        usersList = api.users.get(user_ids=userIds, fields=['bdate', 'sex', 'city'], offset=offset)
+        print("Загружено юзеров: {}".format(offset + 100))
+        tempDataframe = pd.DataFrame(usersList)
+        users = pd.concat([users, tempDataframe])
+
+    users = users.reset_index()
+    print("Количество скачанных юзеров: ", len(users.index))
+
+    users['friends'] = 0
+    users['friends'].astype(int)
+    users['followers'] = 0
+    users['followers'].astype(int)
+
+    # вытягиваем количество друзей для каждого из пользователей
+    for i in range(len(users.index)):
+        time.sleep(delay)
+        response = api.users.get(user_ids=[users.iloc[i]['uid']], fields=['counters'])
+        friends = response[0]['counters']['friends']
+        followers = response[0]['counters']['followers']
+        print("load user #{}, friends = {}, followers = {}".format(i, friends, followers))
+        users.ix[i, 'friends'] = friends
+        users.ix[i, 'followers'] = followers
+
+    print("download is done succesfull")
+
+    users.to_csv(SCRAPPED_FILE)
 
 
 def convert_data_to_table_format():
